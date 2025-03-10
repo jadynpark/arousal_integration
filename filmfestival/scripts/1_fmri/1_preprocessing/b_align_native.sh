@@ -11,10 +11,10 @@ task=("task-movie")
 for subjNo in "${subjID[@]}"
 	do
 	echo Running subject $subjNo
-	subj_dir="../../1_data/1_fmri/1_raw/sub-${subjNo}"
+	subj_dir="../../data/1_fmri/1_raw/sub-${subjNo}"
 
   # Make directory
-    out_dir="../../1_data/1_fmri/2_aligned"
+    out_dir="../../data/1_fmri/2_aligned"
     mkdir $out_dir/sub-${subjNo}
 
     # Combine Files

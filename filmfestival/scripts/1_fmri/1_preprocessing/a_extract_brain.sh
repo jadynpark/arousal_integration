@@ -5,8 +5,8 @@
 
 subjID=("1001" "1002" "1003" "1004")
 
-bids_dir="../../1_data/1_fmri/1_raw"  	 # EDIT THIS TO WHERE YOU SAVED YOUR BIDS FILE
-analyses_dir="../../1_data/1_fmri/1_raw" # EDIT THIS TO WHERE YOU WANT TO SAVE YOUR FMRI FILES (folder must already exist) 
+bids_dir="../../data/1_fmri/1_raw"  	 # EDIT THIS TO WHERE YOU SAVED YOUR BIDS FILE
+analyses_dir="../../data/1_fmri/1_raw" # EDIT THIS TO WHERE YOU WANT TO SAVE YOUR FMRI FILES (folder must already exist) 
 
 for subjNo in "${subjID[@]}"
 	do
