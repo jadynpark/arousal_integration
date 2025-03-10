@@ -1,5 +1,4 @@
-# Emotional arousal enhances narrative memories trhough functional integration of large-scale brain networks
-### Authors: Jadyn S. Park, Kruthi Gollapudi, Jin Ke, Matthias Nau, Ioannis Pappas, Yuan Chang Leong
+# Emotional arousal enhances narrative memories through functional integration of large-scale brain networks
 
 This repository contains analysis code for our manuscript, *Emotional arousal enhances narrative memories trhough functional integration of large-scale brain networks*. If you have any questions or encounter any bugs/broken links, please email me at jadynpark@uchicago.edu.
 
