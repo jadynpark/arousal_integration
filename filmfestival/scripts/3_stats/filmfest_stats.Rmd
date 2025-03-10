@@ -1,7 +1,7 @@
 ---
-title: "figures"
+title: "Bayesian Mixed-Effects Models for Film Festival"
 author: "Jadyn Park"
-date: "2024-02-26"
+date: "2025-03-10"
 output: 
   html_document: 
     code_folding: hide
