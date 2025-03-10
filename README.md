@@ -42,7 +42,7 @@ project/
 1_fmri  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1_preprocessing: preprocessing scripts  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2_bct: extracting graph theoretical metrics  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3_isc: for intersubject correlation analysis 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3_isc: for intersubject correlation analysis  
 2_behav  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1_memory: for extracting memory metrics
 3_stats  
