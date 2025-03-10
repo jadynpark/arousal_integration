@@ -15,21 +15,21 @@ project/
 │       ├── 1_fmri
 │       ├── 2_behav
 │       └── 3_stats
-├── sherlock/
+├── paranoia/
 │   ├── data/
 │   │   ├── 1_fmri
-│   │   ├── 2_behav
-│   │   └── 3_llm
+│   │   └── 2_pupil
 │   └── scripts/
-│       ├── 1_fmri
-│       ├── 2_behav
-│       └── 3_stats
-└── paranoia/
+│       └── 1_pupil
+└── sherlock/
     ├── data/
     │   ├── 1_fmri
-    │   └── 2_pupil
+    │   ├── 2_behav
+    │   └── 3_llm
     └── scripts/
-        └── 1_pupil
+        ├── 1_fmri
+        ├── 2_behav
+        └── 3_stats
 
 ```
 
@@ -44,7 +44,7 @@ project/
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2_bct: extracting graph theoretical metrics  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3_isc: for intersubject correlation analysis  
 2_behav  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1_memory: for extracting memory metrics
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1_memory: for extracting memory metrics  
 3_stats  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stats.Rmd: for running Bayesian mixed effects models
 
