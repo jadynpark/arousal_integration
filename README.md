@@ -34,7 +34,7 @@ project/
 ```
 
 ## Data
-1_fmri: raw data for Film Festival, Sherlock, and Paranoia are available on Openneuro  
+1_fmri: raw data for [Film Festival](https://openneuro.org/datasets/ds004042/versions/1.0.1), [Sherlock](https://openneuro.org/datasets/ds001132/versions/1.0.0), and [Paranoia](https://openneuro.org/datasets/ds001338/versions/1.0.0) are available on Openneuro  
 2_llm: model-generated ratings of arousal  
 3_behav: human ratings of arousal  
 
