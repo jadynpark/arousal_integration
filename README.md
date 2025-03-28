@@ -33,6 +33,12 @@ project/
 
 ```
 
+## System requirements  
+1. FSL: Preprocessing of the functional and structural MRI data were performed using FSL/FEAT v.6.00 (FMRIB software library)  
+2. MATLAB: For the analysis of brain data, custom MATLAB (R2022b) scripts were used  
+3. Python: For the analysis of recall and behavioral data, python (version 3.9) was used  
+4. R: For statistical analysis, R (version 4.3.2) was used  
+
 ## Data
 1_fmri: raw data for [Film Festival](https://openneuro.org/datasets/ds004042/versions/1.0.1), [Sherlock](https://openneuro.org/datasets/ds001132/versions/1.0.0), and [Paranoia](https://openneuro.org/datasets/ds001338/versions/1.0.0) are available on Openneuro  
 2_llm: model-generated ratings of arousal  
@@ -50,6 +56,7 @@ project/
 
 ## Scripts (paranoia)
 1_pupil  
+
 
 
 
