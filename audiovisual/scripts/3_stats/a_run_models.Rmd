@@ -1,0 +1,799 @@
+---
+title: "stats"
+author: "Jadyn Park"
+date: "2024-02-26"
+output: 
+  html_document: 
+    code_folding: hide
+    fig_width: 4
+    fig_height: 4
+---
+
+# This script runs the Bayesian mixed effects models reported in the manuscript
+# Saves the stats results in .RData
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.show=FALSE)
+knitr::opts_knit$set(root.dir = getwd()) 
+
+# Clear environment
+rm(list = ls())
+
+# Load libraries
+library(dplyr)
+library(brms)
+library(rstan)
+library(ggplot2)
+library(posterior)
+library(tidybayes)
+library(ggridges)
+library(bayestestR)
+
+# Help stan run faster
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+# Set directory
+dir = "~/Github/arousal_integration/audiovisual/data/"
+
+# Import Film Festival data
+path_ff = paste0(dir, "1_filmfestival/FilmFest_threshold_015.csv")
+df_filmfest <- read.csv(path_ff, header=TRUE)
+
+# Change subject and events to factors
+df_filmfest$subj <- as.factor(df_filmfest$subj)
+df_filmfest$events <- as.factor(df_filmfest$events)
+
+# Import Sherlock data
+path_sr = paste0(dir, "2_sherlock/Sherlock_threshold_015.csv")
+df_sherlock <- read.csv(path_sr, header=TRUE)
+
+# Add 100 to event and subject number to tell apart from filmfest
+df_sherlock$subj <- df_sherlock$subj + 100
+df_sherlock$events <- df_sherlock$events + 100
+
+# Change subject and events to factors
+df_sherlock$subj <- as.factor(df_sherlock$subj)
+df_sherlock$events <- as.factor(df_sherlock$events)
+
+# Data saving directory
+# savedir <- paste0(dir, "stats/")
+
+```
+
+```{r fxs}
+
+# ----------------------------- Define functions ----------------------------- #
+
+zscore <- function(x) {(x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)}
+
+sem <- function(x) {sd(x,na.rm = T) / sqrt(length(x))}
+
+```
+
+```{r}
+
+# -------------------------------- FilmFest -------------------------------- # 
+
+# Subset df
+df_filmfest_subset <- df_filmfest %>%
+  dplyr::select(arousal_llm, arousal_discrete, recall_accuracy, 
+                Eg_movie,
+                PC_movie_avg,
+                contains("Melbourne"), contains("ISC")
+                )
+
+# Z-score all columns
+df_ff <- as.data.frame(apply(df_filmfest_subset, 2, scale))
+
+# Add other columns back
+df_ff$subj <- df_filmfest$subj
+df_ff$events <- df_filmfest$events
+df_ff$recall <- df_filmfest$recall
+df_ff$event_duration <- df_filmfest$event_duration
+df_ff$dataset <- 1 
+
+
+# -------------------------------- Sherlock -------------------------------- # 
+
+# Subset df
+df_sherlock_subset <- df_sherlock %>%
+  dplyr::select(arousal_llm, arousal_discrete, recall_accuracy, 
+                Eg_movie,
+                PC_movie_avg,
+                contains("Melbourne"), contains("ISC")
+                )
+
+# Z-score all columns
+df_sr <- as.data.frame(apply(df_sherlock_subset, 2, scale))
+
+# Add other columns back
+df_sr$subj <- df_sherlock$subj
+df_sr$events <- df_sherlock$events
+df_sr$recall <- df_sherlock$recall
+df_sr$event_duration <- df_sherlock$event_duration
+df_sr$dataset <- 2
+
+# Stack the two datasets together to create one big dataset
+df_stacked <- rbind(df_ff, df_sr)
+df_stacked$dataset <- as.factor(df_stacked$dataset)
+
+# Save this dataframe
+# write.csv(df_stacked, paste0(savedir, "df_stacked.csv"))
+
+```
+
+# Set priors
+
+```{r}
+
+prior <- c(
+  prior(normal(0, 1), class = Intercept),
+  prior(normal(0, 1), class = b),
+  prior(exponential(1), class = sd),
+  prior(exponential(1), class = sigma)
+)
+
+prior_null <- c(
+  prior(normal(0, 1), class = Intercept),
+  prior(exponential(1), class = sd),
+  prior(exponential(1), class = sigma)
+)
+
+d1 <- df_stacked %>%
+  dplyr::select(subj, events, dataset,
+                recall_accuracy, PC_movie_avg, arousal_llm,
+                Eg_movie,
+                movie_amygdala_ISC, movie_hippocampus_ISC,
+                arousal_discrete,
+                movie_amygdala_Melbourne, movie_hippocampus_Melbourne, movie_hipa_Melbourne)
+
+```
+
+
+# Recall fidelity ~ BT
+
+```{r}
+
+fit_recall_bt <- brm(
+  recall_accuracy ~ PC_movie_avg + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_recall_bt <- as_draws_df(fit_recall_bt)$b_PC_movie_avg
+b_recall_bt = mean(post_recall_bt)
+
+# Summary of posterior
+hdi_recall_bt <- hdi(post_recall_bt, ci=0.95, method="HDI")
+
+# Prop. posterior > 0
+gt_0_recall_bt <- sum(post_recall_bt > 0)/length(post_recall_bt)
+
+# WAIC
+fit_recall_bt <- add_criterion(fit_recall_bt, c("waic", "loo"))
+waic_recall_bt <- waic(fit_recall_bt)
+
+# ========================= ** Model comparisons ** ========================= #
+
+fit_recall_null <- brm(
+  recall_accuracy ~ 1 + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior_null,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+post_recall_null = as_draws_df(fit_recall_null)$b_Intercept
+b_recall_null = mean(post_recall_null)
+
+hdi_recall_null = hdi(post_recall_null, ci=0.95, method = "HDI")
+
+gt_0_recall_null <- sum(post_recall_null > 0)/length(post_recall_null)
+
+fit_recall_null <- add_criterion(fit_recall_null, c("waic", "loo"))
+waic_recall_null <- waic(fit_recall_null)
+
+bf_recall_bt <- bayes_factor(fit_recall_bt, fit_recall_null)
+
+# # === ** Save data ** === # 
+# save(d1, 
+#      fit_recall_bt, post_recall_bt, 
+#      b_recall_bt, hdi_recall_bt, 
+#      gt_0_recall_bt, waic_recall_bt,
+#      fit_recall_null, post_recall_null,
+#      b_recall_null, hdi_recall_null,
+#      gt_0_recall_null, waic_recall_null,
+#      bf_recall_bt,
+#      file = paste0(savedir, "pooled_recall_bt.RData"))
+
+```
+
+
+# BT ~ arousal
+
+```{r}
+
+fit_bt_arousal <- brm(
+  PC_movie_avg ~ arousal_llm + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_bt_arousal <- as_draws_df(fit_bt_arousal)$b_arousal_llm
+b_bt_arousal = mean(post_bt_arousal)
+
+# Summary of posterior
+hdi_bt_arousal <- hdi(post_bt_arousal, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_bt_arousal <- sum(post_bt_arousal > 0)/length(post_bt_arousal)
+
+fit_bt_arousal <- add_criterion(fit_bt_arousal, c("waic", "loo"))
+waic_bt_arousal <- waic(fit_bt_arousal)
+
+# ========================= ** Model comparisons ** ========================= #
+
+fit_bt_null <- brm(
+  PC_movie_avg ~ 1 + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior_null,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+post_bt_null = as_draws_df(fit_bt_null)$b_Intercept
+b_bt_null = mean(post_bt_null)
+
+hdi_bt_null = hdi(post_bt_null, ci=0.95, method = "HDI")
+
+gt_0_bt_null <- sum(post_bt_null > 0)/length(post_bt_null)
+
+fit_bt_null <- add_criterion(fit_bt_null, c("waic", "loo"))
+waic_bt_null <- waic(fit_bt_null)
+
+bf_bt_arousal <- bayes_factor(fit_bt_arousal, fit_bt_null)
+
+# === ** Save data ** === # 
+# save(d1, 
+#      fit_bt_arousal, post_bt_arousal, 
+#      b_bt_arousal, hdi_bt_arousal, 
+#      gt_0_bt_arousal, waic_bt_arousal,
+#      fit_bt_null, post_bt_null,
+#      b_bt_null, hdi_bt_null,
+#      gt_0_bt_null, waic_bt_null,
+#      bf_bt_arousal,
+#      file = paste0(savedir, "pooled_bt_arousal.RData"))
+
+```
+
+
+# Recall fidelity ~ arousal
+
+```{r}
+
+fit_recall_arousal <- brm(
+  recall_accuracy ~ arousal_llm + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE))
+
+# Posterior distribution of model
+post_recall_arousal <- as_draws_df(fit_recall_arousal)$b_arousal_llm
+b_recall_arousal = mean(post_recall_arousal)
+
+# Summary of posterior
+hdi_recall_arousal <- hdi(post_recall_arousal, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_recall_arousal <- sum(post_recall_arousal > 0)/length(post_recall_arousal)
+
+fit_recall_arousal <- add_criterion(fit_recall_arousal, c("waic", "loo"))
+waic_recall_arousal <- waic(fit_recall_arousal)
+
+# === ** Model comparisons ** === #
+bf_recall_arousal <- bayes_factor(fit_recall_arousal, fit_recall_null)
+
+# # === ** Save data ** === # 
+# save(d1, 
+#      fit_recall_arousal, post_recall_arousal, 
+#      b_recall_arousal, hdi_recall_arousal, 
+#      gt_0_recall_arousal, waic_recall_arousal,
+#      bf_recall_arousal,
+#      file = paste0(savedir, "pooled_recall_arousal.RData"))
+```
+
+
+# Mediation
+
+```{r}
+
+# Fit mediator model
+fit_mediator <- brm(PC_movie_avg ~ arousal_llm + (1 | subj) + (1 | dataset),
+                    prior=prior,
+                    control=list(adapt_delta=0.95),
+                    data=d1,
+                    chains=4, cores=4, iter=4000, warmup=1000,
+                    seed=123,
+                    save_pars = save_pars(all = TRUE))
+post_path_a <- as_draws_df(fit_mediator)$b_arousal_llm
+
+# Fit outcome model
+fit_outcome <- brm(recall_accuracy ~ arousal_llm + PC_movie_avg + (1 | subj) + (1 | dataset),
+                   prior=prior,
+                   control=list(adapt_delta=0.95),
+                   data=d1,
+                   chains=4, cores=4, iter=4000, warmup=1000,
+                   seed=123,
+                   save_pars = save_pars(all = TRUE))
+post_path_b <- as_draws_df(fit_outcome)$b_PC_movie_avg 
+
+# Posterior distribution of indirect effect
+post_indirect <- post_path_a * post_path_b
+b_indirect = mean(post_indirect)
+
+hdi_indirect <- hdi(post_indirect, ci=0.95, method='HDI')
+
+# Prop. posterior < 0 and > 0
+gt_0_indirect <- sum(post_indirect > 0)/length(post_indirect)
+
+# WAIC
+fit_outcome <- add_criterion(fit_outcome, c("waic", "loo"))
+waic_outcome <- waic(fit_outcome)
+
+# # === ** Save data ** === # 
+# save(d1, 
+#      fit_mediator, post_path_a, 
+#      fit_outcome, post_path_b, 
+#      post_indirect, b_indirect,
+#      hdi_indirect, gt_0_indirect,
+#      waic_outcome,
+#      file = paste0(savedir, "pooled_mediation.RData"))
+
+```
+
+
+# ISC ~ arousal
+
+```{r}
+
+# === ** Amygdala ISC ~ arousal ** === #
+fit_amygISC_arousal <- brm(
+  movie_amygdala_ISC ~ arousal_llm + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_amygISC_arousal <- as_draws_df(fit_amygISC_arousal)$b_arousal_llm
+b_amygISC_arousal = mean(post_amygISC_arousal)
+
+# Summary of posterior
+hdi_amygISC_arousal <- hdi(post_amygISC_arousal, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_amygISC_arousal <- sum(post_amygISC_arousal > 0)/length(post_amygISC_arousal)
+
+# Model comparisons
+fit_amygISC_arousal <- add_criterion(fit_amygISC_arousal, c("waic", "loo"))
+waic_amygISC_arousal <- waic(fit_amygISC_arousal)
+
+# === ** Model comparisons ** === #
+fit_amygISC_null <- brm(
+  movie_amygdala_ISC ~ 1 + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior_null,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_amygISC_null <- as_draws_df(fit_amygISC_null)$Intercept
+b_amygISC_null = mean(post_amygISC_null)
+
+# Summary of posterior
+hdi_amygISC_null <- hdi(post_amygISC_null, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_amygISC_null <- sum(post_amygISC_null > 0)/length(post_amygISC_null)
+
+# Model comparisons
+fit_amygISC_null <- add_criterion(fit_amygISC_null, c("waic", "loo"))
+waic_amygISC_null <- waic(fit_amygISC_null)
+
+bf_amygISC_arousal <- bayes_factor(fit_amygISC_arousal, fit_amygISC_null)
+
+
+
+
+# === ** Hippocampus ISC ~ arousal ** === #
+fit_hippISC_arousal <- brm(
+  movie_hippocampus_ISC ~ arousal_llm + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_hippISC_arousal <- as_draws_df(fit_hippISC_arousal)$b_arousal_llm
+b_hippISC_arousal = mean(post_hippISC_arousal)
+
+# Summary of posterior
+hdi_hippISC_arousal <- hdi(post_hippISC_arousal, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_hippISC_arousal <- sum(post_hippISC_arousal > 0)/length(post_hippISC_arousal)
+
+# Model comparisons
+fit_hippISC_arousal <- add_criterion(fit_hippISC_arousal, c("waic", "loo"))
+waic_hippISC_arousal <- waic(fit_hippISC_arousal)
+
+# === ** Model comparisons ** === #
+fit_hippISC_null <- brm(
+  movie_hippocampus_ISC ~ 1 + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior_null,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_hippISC_null <- as_draws_df(fit_hippISC_null)$Intercept
+b_hippISC_null = mean(post_hippISC_null)
+
+# Summary of posterior
+hdi_hippISC_null <- hdi(post_hippISC_null, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_hippISC_null <- sum(post_hippISC_null > 0)/length(post_hippISC_null)
+
+# Model comparisons
+fit_hippISC_null <- add_criterion(fit_hippISC_null, c("waic", "loo"))
+waic_hippISC_null <- waic(fit_hippISC_null)
+
+bf_hippISC_arousal <- bayes_factor(fit_hippISC_arousal, fit_hippISC_null)
+
+# # === ** Save data ** === # 
+# save(d1, 
+#      # Amygdala results
+#      fit_amygISC_arousal, post_amygISC_arousal, 
+#      b_amygISC_arousal, hdi_amygISC_arousal, 
+#      gt_0_amygISC_arousal, waic_amygISC_arousal,
+#      fit_amygISC_null, post_amygISC_null,
+#      b_amygISC_null, hdi_amygISC_null,
+#      gt_0_amygISC_null, waic_amygISC_null,
+#      bf_amygISC_arousal,
+#      # Hippocampus results
+#      fit_hippISC_arousal, post_hippISC_arousal, 
+#      b_hippISC_arousal, hdi_hippISC_arousal, 
+#      gt_0_hippISC_arousal, waic_hippISC_arousal,
+#      fit_hippISC_null, post_hippISC_null,
+#      b_hippISC_null, hdi_hippISC_null,
+#      gt_0_hippISC_null, waic_hippISC_null,
+#      bf_hippISC_arousal,
+#      file = paste0(savedir, "pooled_ISC_arousal.RData"))
+
+```
+
+
+# BT ~ ISC
+
+```{r}
+
+# === ** BT ~ Amygdala ISC ** === #
+fit_bt_amygISC <- brm(
+  PC_movie_avg ~ movie_amygdala_ISC + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_bt_amygISC <- as_draws_df(fit_bt_amygISC)$b_movie_amygdala_ISC
+b_bt_amygISC = mean(post_bt_amygISC)
+
+# Summary of posterior
+hdi_bt_amygISC <- hdi(post_bt_amygISC, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_bt_amygISC <- sum(post_bt_amygISC > 0)/length(post_bt_amygISC)
+
+# Model comparisons
+fit_bt_amygISC <- add_criterion(fit_bt_amygISC, c("waic", "loo"))
+waic_bt_amygISC <- waic(fit_bt_amygISC)
+
+# === ** Model comparisons ** === #
+fit_bt_null <- brm(
+  PC_movie_avg ~ 1 + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior_null,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_bt_null <- as_draws_df(fit_bt_null)$Intercept
+b_bt_null = mean(post_bt_null)
+
+# Summary of posterior
+hdi_bt_null <- hdi(post_bt_null, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_bt_null <- sum(post_bt_null > 0)/length(post_bt_null)
+
+# Model comparisons
+fit_bt_null <- add_criterion(fit_bt_null, c("waic", "loo"))
+waic_bt_null <- waic(fit_bt_null)
+
+bf_bt_amygISC <- bayes_factor(fit_bt_amygISC, fit_bt_null)
+
+
+
+
+# === ** BT ~ Hippocampus ISC ** === #
+fit_bt_hippISC <- brm(
+  PC_movie_avg ~ movie_hippocampus_ISC + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_bt_hippISC <- as_draws_df(fit_bt_hippISC)$b_movie_hippocampus_ISC
+b_bt_hippISC = mean(post_bt_hippISC)
+
+# Summary of posterior
+hdi_bt_hippISC <- hdi(post_bt_hippISC, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_bt_hippISC <- sum(post_bt_hippISC > 0)/length(post_bt_hippISC)
+
+# Model comparisons
+fit_bt_hippISC <- add_criterion(fit_bt_hippISC, c("waic", "loo"))
+waic_bt_hippISC <- waic(fit_bt_hippISC)
+
+bf_bt_hippISC <- bayes_factor(fit_bt_hippISC, fit_bt_null)
+
+# # === ** Save data ** === # 
+# save(d1, 
+#      # Amygdala results
+#      fit_bt_amygISC, post_bt_amygISC, 
+#      b_bt_amygISC, hdi_bt_amygISC, 
+#      gt_0_bt_amygISC, waic_bt_amygISC,
+#      fit_bt_null, post_bt_null,
+#      b_bt_null, hdi_bt_null,
+#      gt_0_bt_null, waic_bt_null,
+#      bf_bt_amygISC,
+#      # Hippocampus results
+#      fit_bt_hippISC, post_bt_hippISC, 
+#      b_bt_hippISC, hdi_bt_hippISC, 
+#      gt_0_bt_hippISC, waic_bt_hippISC,
+#      bf_bt_hippISC,
+#      file = paste0(savedir, "pooled_bt_ISC.RData"))
+
+```
+
+
+# Recall ~ ISC
+
+```{r}
+
+# === ** BT ~ Amygdala ISC ** === #
+fit_recall_amygISC <- brm(
+  recall_accuracy ~ movie_amygdala_ISC + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_recall_amygISC <- as_draws_df(fit_recall_amygISC)$b_movie_amygdala_ISC
+b_recall_amygISC = mean(post_recall_amygISC)
+
+# Summary of posterior
+hdi_recall_amygISC <- hdi(post_recall_amygISC, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_recall_amygISC <- sum(post_recall_amygISC > 0)/length(post_recall_amygISC)
+
+# Model comparisons
+fit_recall_amygISC <- add_criterion(fit_recall_amygISC, c("waic", "loo"))
+waic_recall_amygISC <- waic(fit_recall_amygISC)
+
+# === ** Model comparisons ** === #
+fit_recall_null <- brm(
+  recall_accuracy ~ 1 + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior_null,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_recall_null <- as_draws_df(fit_recall_null)$Intercept
+b_recall_null = mean(post_recall_null)
+
+# Summary of posterior
+hdi_recall_null <- hdi(post_recall_null, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_recall_null <- sum(post_recall_null > 0)/length(post_recall_null)
+
+# Model comparisons
+fit_recall_null <- add_criterion(fit_recall_null, c("waic", "loo"))
+waic_recall_bt_null <- waic(fit_recall_null)
+
+bf_recall_amygISC <- bayes_factor(fit_recall_amygISC, fit_recall_null)
+
+
+
+
+# === ** BT ~ Hippocampus ISC ** === #
+fit_recall_hippISC <- brm(
+  recall_accuracy ~ movie_hippocampus_ISC + (1 | subj) + (1 | dataset),
+  data = d1,
+  prior = prior,
+  control = list(adapt_delta = 0.95),
+  chains = 4, cores = 4, iter = 4000, warmup = 1000, seed = 123,
+  save_pars = save_pars(all = TRUE)
+)
+
+# Posterior distribution of model
+post_recall_hippISC <- as_draws_df(fit_recall_hippISC)$b_movie_hippocampus_ISC
+b_recall_hippISC = mean(post_recall_hippISC)
+
+# Summary of posterior
+hdi_recall_hippISC <- hdi(post_recall_hippISC, ci=0.95, method = "HDI")
+
+# Prop. posterior < 0 and > 0
+gt_0_recall_hippISC <- sum(post_recall_hippISC > 0)/length(post_recall_hippISC)
+
+# Model comparisons
+fit_recall_hippISC <- add_criterion(fit_recall_hippISC, c("waic", "loo"))
+waic_recall_hippISC <- waic(fit_recall_hippISC)
+
+bf_recall_hippISC <- bayes_factor(fit_recall_hippISC, fit_recall_null)
+
+# === ** Save data ** === # 
+save(d1, 
+     # Amygdala results
+     fit_recall_amygISC, post_recall_amygISC, 
+     b_recall_amygISC, hdi_recall_amygISC, 
+     gt_0_recall_amygISC, waic_recall_amygISC,
+     fit_recall_null, post_recall_null,
+     b_recall_null, hdi_recall_null,
+     gt_0_recall_null, waic_recall_null,
+     bf_recall_amygISC,
+     # Hippocampus results
+     fit_recall_hippISC, post_recall_hippISC, 
+     b_recall_hippISC, hdi_recall_hippISC, 
+     gt_0_recall_hippISC, waic_recall_hippISC,
+     bf_recall_hippISC,
+     file = paste0(savedir, "pooled_recall_ISC.RData"))
+
+```
+
+
+# Mediation (ISC)
+
+```{r}
+
+# === ** Amygdala ISC ** === #
+
+# Fit mediator model
+fit_mediator_amygISC <- brm(movie_amygdala_ISC ~ arousal_llm + (1 | subj) + (1 | dataset),
+                    prior=prior,
+                    control=list(adapt_delta=0.95),
+                    data=d1,
+                    chains=4, cores=4, iter=4000, warmup=1000,
+                    seed=123,
+                    save_pars = save_pars(all = TRUE))
+post_path_a_amygISC <- as_draws_df(fit_mediator_amygISC)$b_arousal_llm
+
+# Fit outcome model
+fit_outcome_amygISC <- brm(recall_accuracy ~ arousal_llm + movie_amygdala_ISC + (1 | subj) + (1 | dataset),
+                   prior=prior,
+                   control=list(adapt_delta=0.95),
+                   data=d1,
+                   chains=4, cores=4, iter=4000, warmup=1000,
+                   seed=123,
+                   save_pars = save_pars(all = TRUE))
+post_path_b_amygISC <- as_draws_df(fit_outcome_amygISC)$b_movie_amygdala_ISC
+
+# Posterior distribution of indirect effect
+post_indirect_amygISC <- post_path_a_amygISC * post_path_b_amygISC
+b_indirect_amygISC = mean(post_indirect_amygISC)
+
+hdi_indirect_amygISC <- hdi(post_indirect_amygISC, ci=0.95, method='HDI')
+
+# Prop. posterior < 0 and > 0
+gt_0_indirect_amygISC <- sum(post_indirect_amygISC > 0)/length(post_indirect_amygISC)
+
+# WAIC
+fit_outcome_amygISC <- add_criterion(fit_outcome_amygISC, c("waic", "loo"))
+waic_outcome_amygISC <- waic(fit_outcome_amygISC)
+
+# # === ** Save data ** === # 
+# save(d1, 
+#      fit_mediator_amygISC, post_path_a_amygISC, 
+#      fit_outcome_amygISC, post_path_b_amygISC, 
+#      post_indirect_amygISC, b_indirect_amygISC,
+#      hdi_indirect_amygISC, gt_0_indirect_amygISC,
+#      waic_outcome_amygISC,
+#      bf_mediation_amygISC,
+#      file = paste0(savedir, "pooled_mediation_amygISC.RData"))
+
+
+
+# === ** Hippocampus ISC ** === #
+
+# Fit mediator model
+fit_mediator_hippISC <- brm(movie_hippocampus_ISC ~ arousal_llm + (1 | subj) + (1 | dataset),
+                    prior=prior,
+                    control=list(adapt_delta=0.95),
+                    data=d1,
+                    chains=4, cores=4, iter=4000, warmup=1000,
+                    seed=123,
+                    save_pars = save_pars(all = TRUE))
+post_path_a_hippISC <- as_draws_df(fit_mediator_hippISC)$b_arousal_llm
+
+# Fit outcome model
+fit_outcome_hippISC <- brm(recall_accuracy ~ arousal_llm + movie_hippocampus_ISC + (1 | subj) + (1 | dataset),
+                   prior=prior,
+                   control=list(adapt_delta=0.95),
+                   data=d1,
+                   chains=4, cores=4, iter=4000, warmup=1000,
+                   seed=123,
+                   save_pars = save_pars(all = TRUE))
+post_path_b_hippISC <- as_draws_df(fit_outcome_hippISC)$b_movie_hippocampus_ISC
+
+# Posterior distribution of indirect effect
+post_indirect_hippISC <- post_path_a_hippISC * post_path_b_hippISC
+b_indirect_hippISC = mean(post_indirect_hippISC)
+
+hdi_indirect_hippISC <- hdi(post_indirect_hippISC, ci=0.95, method='HDI')
+
+# Prop. posterior < 0 and > 0
+gt_0_indirect_hippISC <- sum(post_indirect_hippISC > 0)/length(post_indirect_hippISC)
+
+# WAIC
+fit_outcome_hippISC <- add_criterion(fit_outcome_hippISC, c("waic", "loo"))
+waic_outcome_hippISC <- waic(fit_outcome_hippISC)
+
+
+# # === ** Save data ** === # 
+# save(d1, 
+#      fit_mediator_hippISC, post_path_a_hippISC, 
+#      fit_outcome_hippISC, post_path_b_hippISC, 
+#      post_indirect_hippISC, b_indirect_hippISC,
+#      hdi_indirect_hippISC, gt_0_indirect_hippISC,
+#      waic_outcome_hippISC,
+#      bf_mediation_hippISC,
+#      file = paste0(savedir, "pooled_mediation_hippISC.RData"))
+
+```
+

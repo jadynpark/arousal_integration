@@ -1,0 +1,345 @@
+---
+title: "figures"
+author: "Jadyn Park"
+date: "2024-02-26"
+output: 
+  html_document: 
+    code_folding: hide
+    fig_width: 4
+    fig_height: 4
+---
+
+# This script creates the figures reported in the manuscript
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.show=FALSE)
+knitr::opts_knit$set(root.dir = getwd()) 
+
+# Clear environment
+rm(list = ls())
+
+# Load libraries
+library(systemfonts)
+library(rempsyc)
+library(flextable)
+library(dplyr)
+library(bayestestR)
+library(ggplot2)
+library(ggtext)
+library(tidyr)
+library(ggsci)
+library(ggExtra)
+library(cowplot)
+library(ggpubr)
+library(grid)
+
+
+# Set directory
+dir = "~/Github/arousal_integration/audiovisual/data/stats/"
+savedir = "~/Github/arousal_integration/audiovisual/data/figures/"
+
+```
+
+
+# Recall fidelity ~ BT
+
+```{r}
+
+# savedir2 = paste0(savedir, 'Figure2/')
+
+# Import data
+load(paste0(dir, "pooled_recall_bt.RData"))
+
+# === ** Report ** === #
+cat("b:", round(median(b_recall_bt),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_recall_bt$CI_low, 2), ", ",
+                       round(hdi_recall_bt$CI_high, 2), "]"), "\n")
+cat("WAIC:", round(waic_recall_bt$estimates["waic", "Estimate"], 2), "\n\n")
+cat("p(b>0):", round(gt_0_recall_bt, 3), "\n")
+cat("BF:", round(bf_recall_bt$bf, 2), "\n")
+
+
+# === ** Figure ** === #
+hist_recall_bt <- ggplot(data.frame(post_recall_bt), aes(x=post_recall_bt)) + 
+  geom_histogram(fill="lightblue") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_recall_bt$CI_low, xmin=hdi_recall_bt$CI_low, xmax=hdi_recall_bt$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_recall_bt$CI_low, y=1, label=round(hdi_recall_bt$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_recall_bt$CI_high, y=1, label=round(hdi_recall_bt$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_recall_bt), y=5, label=paste0("Median=", round(median(post_recall_bt),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_recall_bt), y=1, label=paste0("P(posterior > 0)=", round(gt_0_recall_bt, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_bt
+
+# # Save plot
+# ggsave(
+#   paste0(savedir2, "recall_bt_hist.png"),
+#   hist_recall_bt,
+#   bg='transparent',
+#   width=6, height=3, dpi=300
+# )
+
+```
+
+
+# BT ~ arousal
+
+```{r}
+
+# savedir2 = paste0(savedir, 'Extended Figure 3/')
+
+# Import data
+load(paste0(dir, "pooled_bt_arousal.RData"))
+
+# === ** Report ** === #
+cat("b:", round(median(b_bt_arousal),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_bt_arousal$CI_low, 2), ", ",
+                       round(hdi_bt_arousal$CI_high, 2), "]"), "\n")
+cat("WAIC:", round(waic_bt_arousal$estimates["waic", "Estimate"], 2), "\n\n")
+cat("p(b>0):", round(gt_0_bt_arousal, 3), "\n")
+cat("BF:", round(bf_bt_arousal$bf, 2), "\n")
+
+
+# === ** Figure ** === #
+hist_bt_arousal <- ggplot(data.frame(post_bt_arousal), aes(x=post_bt_arousal)) + 
+  geom_histogram(fill="lightblue") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_bt_arousal$CI_low, xmin=hdi_bt_arousal$CI_low, xmax=hdi_bt_arousal$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_bt_arousal$CI_low, y=1, label=round(hdi_bt_arousal$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_bt_arousal$CI_high, y=1, label=round(hdi_bt_arousal$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_bt_arousal), y=5, label=paste0("Median=", round(median(post_bt_arousal),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_bt_arousal), y=1, label=paste0("P(posterior > 0)=", round(gt_0_bt_arousal, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_bt_arousal
+
+# # Save plot
+# ggsave(
+#   paste0(savedir2, "bt_arousal_hist.png"),
+#   hist_bt_arousal,
+#   bg='transparent',
+#   width=6, height=3, dpi=300
+# )
+
+```
+
+
+# Recall fidelity ~ arousal
+
+```{r}
+
+# savedir2 = paste0(savedir, 'Extended Figure 3/')
+
+# Import data
+load(paste0(dir, "pooled_recall_arousal.RData"))
+
+# === ** Report ** === #
+cat("b:", round(median(b_recall_arousal),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_recall_arousal$CI_low, 2), ", ",
+                       round(hdi_recall_arousal$CI_high, 2), "]"), "\n")
+cat("WAIC:", round(waic_recall_arousal$estimates["waic", "Estimate"], 2), "\n\n")
+cat("p(b>0):", round(gt_0_recall_arousal, 3), "\n")
+cat("BF:", round(bf_recall_arousal$bf, 2), "\n")
+
+
+# === ** Figure ** === #
+hist_recall_arousal <- ggplot(data.frame(post_recall_arousal), aes(x=post_recall_arousal)) + 
+  geom_histogram(fill="lightblue") +
+  labs(x="Posterior distribution") +
+  geom_vline(xintercept=0, colour="azure4", linetype=2) +
+  scale_color_manual(values = "black") +
+  theme_classic()   +
+  theme(
+    legend.position="none",
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent'),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+  # Add HDI
+  geom_errorbarh(aes(y=0, x=hdi_recall_arousal$CI_low, xmin=hdi_recall_arousal$CI_low, xmax=hdi_recall_arousal$CI_high), col="black", size=2) +
+  geom_text(aes(x=hdi_recall_arousal$CI_low, y=1, label=round(hdi_recall_arousal$CI_low,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=hdi_recall_arousal$CI_high, y=1, label=round(hdi_recall_arousal$CI_high,3)), vjust=-0.5, color="black", size=7) +
+  geom_text(aes(x=median(post_recall_arousal), y=5, label=paste0("Median=", round(median(post_recall_arousal),3))), vjust=-8.5, color="black", size=7) +
+  # Add prop. posterior
+  geom_text(aes(x=median(post_recall_arousal), y=1, label=paste0("P(posterior > 0)=", round(gt_0_recall_arousal, 3))), 
+            vjust=-7.0, color="black", size=7, fontface="italic") +
+  scale_x_continuous(breaks = seq(0, 0.5, by = 0.1))
+
+hist_recall_arousal
+
+# # Save plot
+# ggsave(
+#   paste0(savedir2, "recall_arousal_hist.png"),
+#   hist_recall_arousal,
+#   bg='transparent',
+#   width=6, height=3, dpi=300
+# )
+
+```
+
+
+# Mediation
+
+```{r}
+
+# savedir2 = paste0(savedir, 'Figure3/')
+
+# Import data
+load(paste0(dir, "pooled_mediation.RData"))
+load(paste0(dir, "filmfest_mediation.RData"))
+load(paste0(dir, "sherlock_mediation.RData"))
+
+# === ** Report ** === #
+cat("b:", round(median(b_indirect),2), "\n")
+cat("95% HDI:", paste0("[", round(hdi_indirect$CI_low, 2), ", ",
+                       round(hdi_indirect$CI_high, 2), "]"), "\n")
+cat("WAIC:", round(waic_outcome$estimates["waic", "Estimate"], 2), "\n\n")
+cat("p(b>0):", round(gt_0_indirect, 3), "\n")
+
+
+# === ** Plot ** === #
+# Combine and factor levels
+posterior_df <- bind_rows(
+  data.frame(value = post_indirect_filmfest, group = "FilmFestival"),
+  data.frame(value = post_indirect_sherlock, group = "Sherlock"),
+  data.frame(value = post_indirect, group = "Pooled")
+) %>%
+  mutate(group = factor(group, levels = c("FilmFestival", "Sherlock", "Pooled")))
+
+hist_mediation <- ggplot() +
+  # Pooled
+  geom_histogram(data = filter(posterior_df, group == "Pooled"),
+                 aes(x = value, fill = group, color = group),
+                 alpha = 0.9, bins = 30, position = "identity",
+                 color = NA) +
+  
+  # Film Festival
+  geom_step(data = filter(posterior_df, group == "FilmFestival"),
+            aes(x = value, color = group),
+            stat = "bin", bins = 30, direction = "mid", size = 1.5,
+            alpha = 0.2) +
+  geom_histogram(data = filter(posterior_df, group == "FilmFestival"),
+                 aes(x = value, fill = group, color = group),
+                 alpha = 0.05, bins = 30, position = "identity",
+                 color = NA) +
+  
+  # Sherlock
+  geom_step(data = filter(posterior_df, group == "Sherlock"),
+            aes(x = value, color = group),
+            stat = "bin", bins = 30, direction = "mid", size = 1.5,
+            alpha = 0.2) +
+  geom_histogram(data = filter(posterior_df, group == "Sherlock"),
+                 aes(x = value, fill = group, color = group),
+                 alpha = 0.05, bins = 30, position = "identity",
+                 color = NA) +
+  
+  # Vertical line and annotations
+  geom_vline(xintercept = 0, colour = "azure4", linetype = 2) +
+  
+  # HDI and text
+  geom_errorbarh(aes(y = 0, xmin = hdi_indirect$CI_low, xmax = hdi_indirect$CI_high),
+                 height = 0.5, size = 2, color = "black") +
+  geom_text(aes(x = hdi_indirect$CI_low, y = 1,
+                label = round(hdi_indirect$CI_low, 3)),
+            vjust = -0.5, color = "black", size = 7) +
+  geom_text(aes(x = hdi_indirect$CI_high, y = 1,
+                label = round(hdi_indirect$CI_high, 3)),
+            vjust = -0.5, color = "black", size = 7) +
+  geom_text(aes(x = median(post_indirect), y = 5,
+                label = paste0("Median = ", round(mean(post_indirect), 3))),
+            vjust = -8.5, color = "black", size = 7) +
+  geom_text(aes(x = mean(post_indirect), y = 1,
+                label = paste0("P(posterior > 0) = ", round(gt_0_indirect, 3))),
+            vjust = -7, color = "black", size = 7, fontface = "italic") +
+  
+  # Color settings
+  scale_fill_manual(values = c(
+    "FilmFestival" = pal_d3("category10")(10)[2],
+    "Sherlock" = pal_d3("category10")(10)[3],
+    "Pooled" = "lightblue"
+  )) +
+  scale_color_manual(values = c(
+    "FilmFestival" = pal_d3("category10")(10)[2],
+    "Sherlock" = pal_d3("category10")(10)[3],
+    "Pooled" = "lightblue"
+  )) +
+  labs(x = "Posterior distribution", color = NULL, fill = NULL) +
+  theme_classic() +
+  theme(
+    legend.position="left",
+    legend.text = element_text(size = 18, color = "black"),
+    text=element_text(size=22, family="Arial", color="black"),
+    axis.title=element_text(size=22, color="black"),
+    axis.text.x=element_text(size=22, color="black"),
+    axis.text.y=element_blank(),
+    axis.title.y=element_blank(),    
+    panel.background = element_rect(fill='transparent'),
+    plot.background = element_rect(fill='transparent', color=NA),
+    legend.background = element_rect(fill='transparent'),
+    legend.box.background = element_rect(fill='transparent', color=NA),
+    plot.margin=margin(0, 1, 0, 1, "cm")
+  ) +
+guides(
+  fill = guide_legend(override.aes = list(alpha = 0.6)),
+  color = "none"
+)
+
+
+# # Save plot
+# ggsave(
+#   paste0(savedir2, "mediation_hist.png"),
+#   hist_mediation,
+#   bg='transparent',
+#   width=7, height=3, dpi=300
+# )
+
+
+```
+
