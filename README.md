@@ -6,30 +6,21 @@ The repository follows the data structure outlined below.
 
 ```
 project/
-├── filmfestival/
+├── audiovisual/
 │   ├── data/
-│   │   ├── 1_fmri
-│   │   ├── 2_behav
-│   │   └── 3_llm
+│   │   ├── 1_filmfestival/
+│   │   │   └── arousal_ratings
+│   │   └── 2_sherlock/
+│   │       └── arousal_ratings
 │   └── scripts/
-│       ├── 1_fmri
-│       ├── 2_behav
-│       └── 3_stats
-├── paranoia/
-│   ├── data/
-│   │   ├── 1_fmri
-│   │   └── 2_pupil
-│   └── scripts/
-│       └── 1_pupil
-└── sherlock/
+│       ├── 1_fmri/
+│       ├── 2_behav/
+│       └── 3_stats/
+└── audio/
     ├── data/
-    │   ├── 1_fmri
-    │   ├── 2_behav
-    │   └── 3_llm
+    │   └── pupil/
     └── scripts/
-        ├── 1_fmri
-        ├── 2_behav
-        └── 3_stats
+        └── pupil/
 
 ```
 
@@ -40,22 +31,16 @@ project/
 4. R: For statistical analysis, R (version 4.3.2) was used  
 
 ## Data
-1_fmri: raw data for [Film Festival](https://openneuro.org/datasets/ds004042/versions/1.0.1), [Sherlock](https://openneuro.org/datasets/ds001132/versions/1.0.0), and [Paranoia](https://openneuro.org/datasets/ds001338/versions/1.0.0) are available on Openneuro  
-2_llm: model-generated ratings of arousal  
-3_behav: human ratings of arousal  
+arousal_ratings: contains model-generated and human arousal ratings   
+fmri: raw data for [Film Festival](https://openneuro.org/datasets/ds004042/versions/1.0.1) and [Paranoia](https://openneuro.org/datasets/ds001338/versions/1.0.0) are available on Openneuro. Preprocessed data for [Sherlock](https://dataspace.princeton.edu/handle/88435/dsp01nz8062179) is available on Princeton DataSpace.
 
-## Scripts (Film Festival, Sherlock)
-1_fmri  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1_preprocessing: preprocessing scripts  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2_bct: extracting graph theoretical metrics  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3_isc: for intersubject correlation analysis  
-2_behav  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1_memory: for extracting memory metrics  
-3_stats  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stats.Rmd: for running Bayesian mixed effects models
+## Scripts (audiovisual)
+1_fmri: contains scripts for preprocessing fMRI data (1_preprocessing), running graph theoretic analysis (2_bct), and running intersubject correlation analysis (3_isc)  
+2_behav: contains script for calculating recall fidelity  
+3_stats: contains scripts for running Bayesian mixed effects models  
 
-## Scripts (paranoia)
-1_pupil  
+## Scripts (audio)
+pupil: contains scripts for preprocessing pupil data  
 
 
 
